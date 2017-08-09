@@ -11,6 +11,17 @@ class OpenSSL::RSAKey {
     has $.private;
     has $.rsa;
 
+    enum RsaPadding (
+        RSA_PKCS1_PADDING => 1,
+        RSA_SSLV23_PADDING => 2,
+        RSA_NO_PADDING => 3,
+        RSA_PKCS1_OAEP_PADDING => 4,
+        RSA_X931_PADDING => 5,
+        # EVP_PKEY_ only
+        RSA_PKCS1_PSS_PADDING => 6,
+        RSA_PKCS1_PADDING_SIZE => 11
+    );
+
     submethod DESTROY {
         OpenSSL::RSA::RSA_free($!rsa);
     }
@@ -101,4 +112,29 @@ class OpenSSL::RSAKey {
         return True if $ret == 1;
         return False;
     }
+
+    method public_encrypt(Blob $from, RsaPadding:D $padding --> Blob) {
+        die "Must have public key to public encrypt" if $.private;
+        my $to = buf8.new;
+        $to[OpenSSL::RSA::RSA_size($.rsa)-1] = 0;
+        my $ret = OpenSSL::RSA::RSA_public_encrypt($from.bytes, $from, $to, $.rsa, $padding.value);
+        if $ret > 0 {
+            return $to;
+        } else {
+            return Blob:U;
+        }
+    }
+
+    method private_decrypt(Blob $from, RsaPadding:D $padding --> Blob) {
+        die "Must have private key to private decrypt" unless $.private;
+        my $to = buf8.new;
+        $to[OpenSSL::RSA::RSA_size($.rsa)-1] = 0;
+        my $ret = OpenSSL::RSA::RSA_private_decrypt($from.bytes, $from, $to, $.rsa, $padding.value);
+        if $ret > 0 {
+            return $to;
+        } else {
+            return Blob:U;
+        }
+    }
+
 }
